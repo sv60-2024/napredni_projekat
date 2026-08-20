@@ -1,0 +1,27 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test binaries
+*.test
+
+# Coverage
+*.out
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Runtime data
+data/wal/*
+data/sstable/*
+
+# Keep directories
+!data/wal/.gitkeep
+!data/sstable/.gitkeep

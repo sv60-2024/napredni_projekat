@@ -1,0 +1,6 @@
+{
+  "memtable_size": 10,
+  "wal_segment_size": 10,
+  "block_size": 4096,
+  "block_cache_size": 20
+}
