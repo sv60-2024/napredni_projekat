@@ -30,14 +30,15 @@ func (e *Engine) Put(key string, value []byte) error {
 		Tombstone: false,
 	}
 
-	// Kasnije ovde ide:
-	// WAL.Append(rec)
+	// Kasnije ce ovde prvo ici WAL zapis.
+	// wal.Append(rec)
 
 	e.memtable.Put(rec)
 
-	// Kasnije ovde proveravamo flush u SSTable.
 	if e.memtable.IsFull() {
-		// SSTable.Create(e.memtable.GetAllSorted())
+		// Kasnije:
+		// records := e.memtable.GetAllSorted()
+		// sstable.Create(records)
 		// e.memtable.Clear()
 	}
 
@@ -59,8 +60,7 @@ func (e *Engine) Get(key string) ([]byte, error) {
 		return rec.Value, nil
 	}
 
-	// Kasnije ovde:
-	// SSTable.Get(key)
+	// Kasnije ovde ide pretraga SSTable-a.
 
 	return nil, errors.New("kljuc ne postoji")
 }
@@ -70,11 +70,17 @@ func (e *Engine) Delete(key string) error {
 		return errors.New("kljuc ne sme biti prazan")
 	}
 
-	timestamp := uint64(time.Now().Unix())
+	rec := record.Record{
+		Key:       key,
+		Value:     nil,
+		Timestamp: uint64(time.Now().Unix()),
+		Tombstone: true,
+	}
 
-	// Kasnije prvo ide WAL DELETE zapis.
+	// Kasnije prvo ide WAL zapis.
+	// wal.Append(rec)
 
-	e.memtable.Delete(key, timestamp)
+	e.memtable.Put(rec)
 
 	return nil
 }

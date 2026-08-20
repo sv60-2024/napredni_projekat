@@ -27,17 +27,6 @@ func (m *Memtable) Get(key string) (record.Record, bool) {
 	return rec, exists
 }
 
-func (m *Memtable) Delete(key string, timestamp uint64) {
-	rec := record.Record{
-		Key:       key,
-		Value:     nil,
-		Timestamp: timestamp,
-		Tombstone: true,
-	}
-
-	m.records[key] = rec
-}
-
 func (m *Memtable) IsFull() bool {
 	return len(m.records) >= m.maxSize
 }
