@@ -1,57 +1,106 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"time"
+	"os"
+	"strings"
 
 	"napredni_algoritmi_projekat/internal/config"
-	"napredni_algoritmi_projekat/internal/memtable"
-	"napredni_algoritmi_projekat/internal/record"
+	"napredni_algoritmi_projekat/internal/engine"
 )
 
 func main() {
 	cfg, err := config.LoadConfig("config/config.json")
 	if err != nil {
-		fmt.Println("Greska:", err)
+		fmt.Println("Greska pri ucitavanju konfiguracije:", err)
 		return
 	}
 
-	mt := memtable.NewMemtable(cfg.MemtableSize)
+	kvEngine := engine.NewEngine(cfg.MemtableSize)
 
-	rec1 := record.Record{
-		Key:       "marko",
-		Value:     []byte("Marko"),
-		Timestamp: uint64(time.Now().Unix()),
-		Tombstone: false,
-	}
+	scanner := bufio.NewScanner(os.Stdin)
 
-	rec2 := record.Record{
-		Key:       "andrej",
-		Value:     []byte("Andrej"),
-		Timestamp: uint64(time.Now().Unix()),
-		Tombstone: false,
-	}
+	fmt.Println("KV Engine")
+	fmt.Println("Dostupne komande:")
+	fmt.Println("PUT <key> <value>")
+	fmt.Println("GET <key>")
+	fmt.Println("DELETE <key>")
+	fmt.Println("EXIT")
 
-	mt.Put(rec1)
-	mt.Put(rec2)
+	for {
+		fmt.Print("> ")
 
-	rec, exists := mt.Get("andrej")
-	if exists {
-		fmt.Println("Pronadjen:", string(rec.Value))
-	}
+		if !scanner.Scan() {
+			break
+		}
 
-	fmt.Println("Broj elemenata:", mt.Size())
-	fmt.Println("Memtable puna:", mt.IsFull())
+		input := strings.TrimSpace(scanner.Text())
 
-	fmt.Println("Sortirani zapisi:")
-	for _, r := range mt.GetAllSorted() {
-		fmt.Println(r.Key, string(r.Value))
-	}
+		if input == "" {
+			continue
+		}
 
-	mt.Delete("andrej", uint64(time.Now().Unix()))
+		parts := strings.Fields(input)
 
-	deletedRec, exists := mt.Get("andrej")
-	if exists {
-		fmt.Println("Tombstone za andrej:", deletedRec.Tombstone)
+		command := strings.ToUpper(parts[0])
+
+		switch command {
+
+		case "PUT":
+			if len(parts) < 3 {
+				fmt.Println("Upotreba: PUT <key> <value>")
+				continue
+			}
+
+			key := parts[1]
+
+			value := strings.Join(parts[2:], " ")
+
+			err := kvEngine.Put(key, []byte(value))
+			if err != nil {
+				fmt.Println("Greska:", err)
+				continue
+			}
+
+			fmt.Println("OK")
+
+		case "GET":
+			if len(parts) != 2 {
+				fmt.Println("Upotreba: GET <key>")
+				continue
+			}
+
+			value, err := kvEngine.Get(parts[1])
+
+			if err != nil {
+				fmt.Println("Greska:", err)
+				continue
+			}
+
+			fmt.Println(string(value))
+
+		case "DELETE":
+			if len(parts) != 2 {
+				fmt.Println("Upotreba: DELETE <key>")
+				continue
+			}
+
+			err := kvEngine.Delete(parts[1])
+
+			if err != nil {
+				fmt.Println("Greska:", err)
+				continue
+			}
+
+			fmt.Println("OK")
+
+		case "EXIT":
+			fmt.Println("Gasenje programa.")
+			return
+
+		default:
+			fmt.Println("Nepoznata komanda.")
+		}
 	}
 }
