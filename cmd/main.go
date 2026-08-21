@@ -42,11 +42,9 @@ func main() {
 		}
 
 		parts := strings.Fields(input)
-
 		command := strings.ToUpper(parts[0])
 
 		switch command {
-
 		case "PUT":
 			if len(parts) < 3 {
 				fmt.Println("Upotreba: PUT <key> <value>")
@@ -54,11 +52,9 @@ func main() {
 			}
 
 			key := parts[1]
-
 			value := strings.Join(parts[2:], " ")
 
-			err := kvEngine.Put(key, []byte(value))
-			if err != nil {
+			if err := kvEngine.Put(key, []byte(value)); err != nil {
 				fmt.Println("Greska:", err)
 				continue
 			}
@@ -72,7 +68,6 @@ func main() {
 			}
 
 			value, err := kvEngine.Get(parts[1])
-
 			if err != nil {
 				fmt.Println("Greska:", err)
 				continue
@@ -86,9 +81,7 @@ func main() {
 				continue
 			}
 
-			err := kvEngine.Delete(parts[1])
-
-			if err != nil {
+			if err := kvEngine.Delete(parts[1]); err != nil {
 				fmt.Println("Greska:", err)
 				continue
 			}
