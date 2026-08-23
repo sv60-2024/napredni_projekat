@@ -4,18 +4,38 @@ import (
 	"errors"
 	"time"
 
+	"napredni_algoritmi_projekat/internal/config"
 	"napredni_algoritmi_projekat/internal/memtable"
 	"napredni_algoritmi_projekat/internal/record"
+	"napredni_algoritmi_projekat/internal/wal"
 )
 
 type Engine struct {
 	memtable *memtable.Memtable
+	wal      *wal.WAL
 }
 
-func NewEngine(memtableSize int) *Engine {
-	return &Engine{
-		memtable: memtable.NewMemtable(memtableSize),
+func NewEngine(cfg config.Config) (*Engine, error) {
+	mt := memtable.NewMemtable(cfg.MemtableSize)
+
+	w, err := wal.New("data/wal", cfg.WALSegmentSize)
+	if err != nil {
+		return nil, err
 	}
+
+	records, err := w.Recover()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, rec := range records {
+		mt.Put(rec)
+	}
+
+	return &Engine{
+		memtable: mt,
+		wal:      w,
+	}, nil
 }
 
 func (e *Engine) Put(key string, value []byte) error {
@@ -30,16 +50,14 @@ func (e *Engine) Put(key string, value []byte) error {
 		Tombstone: false,
 	}
 
-	// Kasnije ce ovde prvo ici WAL zapis.
-	// wal.Append(rec)
+	if err := e.wal.Append(rec); err != nil {
+		return err
+	}
 
 	e.memtable.Put(rec)
 
 	if e.memtable.IsFull() {
-		// Kasnije:
-		// records := e.memtable.GetAllSorted()
-		// sstable.Create(records)
-		// e.memtable.Clear()
+		// SSTable flush se dodaje kasnije
 	}
 
 	return nil
@@ -60,8 +78,6 @@ func (e *Engine) Get(key string) ([]byte, error) {
 		return rec.Value, nil
 	}
 
-	// Kasnije ovde ide pretraga SSTable-a.
-
 	return nil, errors.New("kljuc ne postoji")
 }
 
@@ -77,8 +93,9 @@ func (e *Engine) Delete(key string) error {
 		Tombstone: true,
 	}
 
-	// Kasnije prvo ide WAL zapis.
-	// wal.Append(rec)
+	if err := e.wal.Append(rec); err != nil {
+		return err
+	}
 
 	e.memtable.Put(rec)
 

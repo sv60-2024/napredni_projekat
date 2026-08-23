@@ -17,7 +17,11 @@ func main() {
 		return
 	}
 
-	kvEngine := engine.NewEngine(cfg.MemtableSize)
+	kvEngine, err := engine.NewEngine(cfg)
+	if err != nil {
+		fmt.Println("Greska pri pokretanju engine-a:", err)
+		return
+	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 
