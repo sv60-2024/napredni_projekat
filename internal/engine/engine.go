@@ -7,12 +7,14 @@ import (
 	"napredni_algoritmi_projekat/internal/config"
 	"napredni_algoritmi_projekat/internal/memtable"
 	"napredni_algoritmi_projekat/internal/record"
+	"napredni_algoritmi_projekat/internal/sstable"
 	"napredni_algoritmi_projekat/internal/wal"
 )
 
 type Engine struct {
 	memtable *memtable.Memtable
 	wal      *wal.WAL
+	sstables []*sstable.SSTable
 }
 
 func NewEngine(cfg config.Config) (*Engine, error) {
@@ -35,6 +37,7 @@ func NewEngine(cfg config.Config) (*Engine, error) {
 	return &Engine{
 		memtable: mt,
 		wal:      w,
+		sstables: make([]*sstable.SSTable, 0),
 	}, nil
 }
 
@@ -57,7 +60,9 @@ func (e *Engine) Put(key string, value []byte) error {
 	e.memtable.Put(rec)
 
 	if e.memtable.IsFull() {
-		// SSTable flush se dodaje kasnije
+		if err := e.flushMemtable(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -76,6 +81,22 @@ func (e *Engine) Get(key string) ([]byte, error) {
 		}
 
 		return rec.Value, nil
+	}
+
+	for i := len(e.sstables) - 1; i >= 0; i-- {
+		rec, found, err := e.sstables[i].Get(key)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if found {
+			if rec.Tombstone {
+				return nil, errors.New("kljuc ne postoji")
+			}
+
+			return rec.Value, nil
+		}
 	}
 
 	return nil, errors.New("kljuc ne postoji")
@@ -98,6 +119,26 @@ func (e *Engine) Delete(key string) error {
 	}
 
 	e.memtable.Put(rec)
+
+	if e.memtable.IsFull() {
+		if err := e.flushMemtable(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) flushMemtable() error {
+	records := e.memtable.GetAllSorted()
+
+	table, err := sstable.Create(records)
+	if err != nil {
+		return err
+	}
+
+	e.sstables = append(e.sstables, table)
+	e.memtable.Clear()
 
 	return nil
 }
