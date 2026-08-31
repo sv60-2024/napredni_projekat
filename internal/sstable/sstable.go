@@ -107,3 +107,78 @@ func Create(records []record.Record) (*SSTable, error) {
 		Filter:  filter,
 	}, nil
 }
+
+func (s *SSTable) Get(key string) (record.Record, bool, error) {
+	if !s.Filter.MightContain(key) {
+		return record.Record{}, false, nil
+	}
+
+	if !s.Summary.ContainsKey(key) {
+		return record.Record{}, false, nil
+	}
+
+	indexOffset := s.Summary.FindStartOffset(key)
+
+	for indexOffset < uint64(len(s.Index)) {
+		entry, nextOffset, err := s.readIndexEntry(indexOffset)
+		if err != nil {
+			return record.Record{}, false, err
+		}
+
+		if entry.Key == key {
+			rec, err := s.readDataRecord(entry.Offset)
+			if err != nil {
+				return record.Record{}, false, err
+			}
+
+			return rec, true, nil
+		}
+
+		if entry.Key > key {
+			return record.Record{}, false, nil
+		}
+
+		indexOffset = nextOffset
+	}
+
+	return record.Record{}, false, nil
+}
+
+func (s *SSTable) readIndexEntry(offset uint64) (IndexEntry, uint64, error) {
+	if offset+4 > uint64(len(s.Index)) {
+		return IndexEntry{}, 0, errors.New("neispravan index offset")
+	}
+
+	size := binary.LittleEndian.Uint32(s.Index[offset : offset+4])
+
+	start := offset + 4
+	end := start + uint64(size)
+
+	if end > uint64(len(s.Index)) {
+		return IndexEntry{}, 0, errors.New("neispravan index zapis")
+	}
+
+	entry, err := deserializeIndexEntry(s.Index[start:end])
+	if err != nil {
+		return IndexEntry{}, 0, err
+	}
+
+	return entry, end, nil
+}
+
+func (s *SSTable) readDataRecord(offset uint64) (record.Record, error) {
+	if offset+4 > uint64(len(s.Data)) {
+		return record.Record{}, errors.New("neispravan data offset")
+	}
+
+	size := binary.LittleEndian.Uint32(s.Data[offset : offset+4])
+
+	start := offset + 4
+	end := start + uint64(size)
+
+	if end > uint64(len(s.Data)) {
+		return record.Record{}, errors.New("neispravan data zapis")
+	}
+
+	return deserializeRecord(s.Data[start:end])
+}
