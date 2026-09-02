@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"napredni_algoritmi_projekat/internal/blockmanager"
 	"napredni_algoritmi_projekat/internal/config"
 	"napredni_algoritmi_projekat/internal/memtable"
 	"napredni_algoritmi_projekat/internal/record"
@@ -12,15 +13,21 @@ import (
 )
 
 type Engine struct {
-	memtable *memtable.Memtable
-	wal      *wal.WAL
-	sstables []*sstable.SSTable
+	memtable     *memtable.Memtable
+	wal          *wal.WAL
+	blockManager *blockmanager.BlockManager
+	sstables     []*sstable.SSTable
 }
 
 func NewEngine(cfg config.Config) (*Engine, error) {
 	mt := memtable.NewMemtable(cfg.MemtableSize)
 
 	w, err := wal.New("data/wal", cfg.WALSegmentSize)
+	if err != nil {
+		return nil, err
+	}
+
+	bm, err := blockmanager.New(cfg.BlockSize, cfg.BlockCacheSize)
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +42,10 @@ func NewEngine(cfg config.Config) (*Engine, error) {
 	}
 
 	return &Engine{
-		memtable: mt,
-		wal:      w,
-		sstables: make([]*sstable.SSTable, 0),
+		memtable:     mt,
+		wal:          w,
+		blockManager: bm,
+		sstables:     make([]*sstable.SSTable, 0),
 	}, nil
 }
 
@@ -85,7 +93,6 @@ func (e *Engine) Get(key string) ([]byte, error) {
 
 	for i := len(e.sstables) - 1; i >= 0; i-- {
 		rec, found, err := e.sstables[i].Get(key)
-
 		if err != nil {
 			return nil, err
 		}
