@@ -27,7 +27,18 @@ func NewEngine(cfg config.Config) (*Engine, error) {
 		return nil, err
 	}
 
-	bm, err := blockmanager.New(cfg.BlockSize, cfg.BlockCacheSize)
+	bm, err := blockmanager.New(
+		cfg.BlockSize,
+		cfg.BlockCacheSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tables, err := sstable.LoadAll(
+		"data/sstable",
+		bm,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +56,7 @@ func NewEngine(cfg config.Config) (*Engine, error) {
 		memtable:     mt,
 		wal:          w,
 		blockManager: bm,
-		sstables:     make([]*sstable.SSTable, 0),
+		sstables:     tables,
 	}, nil
 }
 
@@ -93,6 +104,7 @@ func (e *Engine) Get(key string) ([]byte, error) {
 
 	for i := len(e.sstables) - 1; i >= 0; i-- {
 		rec, found, err := e.sstables[i].Get(key)
+
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +156,21 @@ func (e *Engine) flushMemtable() error {
 		return err
 	}
 
+	id, err := sstable.NextID("data/sstable")
+	if err != nil {
+		return err
+	}
+
+	if err := table.Save(
+		"data/sstable",
+		id,
+		e.blockManager,
+	); err != nil {
+		return err
+	}
+
 	e.sstables = append(e.sstables, table)
+
 	e.memtable.Clear()
 
 	return nil
