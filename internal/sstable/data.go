@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 
 	"napredni_algoritmi_projekat/internal/record"
 )
@@ -70,13 +71,17 @@ func deserializeRecord(data []byte) (record.Record, error) {
 	}
 
 	keyBytes := make([]byte, keySize)
-	if _, err := buffer.Read(keyBytes); err != nil {
+
+	if _, err := io.ReadFull(buffer, keyBytes); err != nil {
 		return record.Record{}, err
 	}
 
 	valueBytes := make([]byte, valueSize)
-	if _, err := buffer.Read(valueBytes); err != nil {
-		return record.Record{}, err
+
+	if valueSize > 0 {
+		if _, err := io.ReadFull(buffer, valueBytes); err != nil {
+			return record.Record{}, err
+		}
 	}
 
 	return record.Record{
