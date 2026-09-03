@@ -30,7 +30,11 @@ func NewEngine(cfg config.Config) (*Engine, error) {
 		return nil, err
 	}
 
-	w, err := wal.NewWithBlockManager("data/wal", cfg.WALSegmentSize, bm)
+	w, err := wal.NewWithBlockManager(
+		"data/wal",
+		cfg.WALSegmentSize,
+		bm,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +108,6 @@ func (e *Engine) Get(key string) ([]byte, error) {
 
 	for i := len(e.sstables) - 1; i >= 0; i-- {
 		rec, found, err := e.sstables[i].Get(key)
-
 		if err != nil {
 			return nil, err
 		}
@@ -170,6 +173,10 @@ func (e *Engine) flushMemtable() error {
 	}
 
 	e.sstables = append(e.sstables, table)
+
+	if err := e.wal.Clear(); err != nil {
+		return err
+	}
 
 	e.memtable.Clear()
 

@@ -101,10 +101,15 @@ func (w *WAL) Append(rec record.Record) error {
 			index: segment.index + 1,
 			path:  segmentPath(w.directory, segment.index+1),
 		}
+
 		count = 0
 	}
 
-	if err := w.blockManager.WriteBlock(segment.path, count, data); err != nil {
+	if err := w.blockManager.WriteBlock(
+		segment.path,
+		count,
+		data,
+	); err != nil {
 		return fmt.Errorf("greska pri upisu WAL zapisa: %w", err)
 	}
 
@@ -114,14 +119,22 @@ func (w *WAL) Append(rec record.Record) error {
 func (w *WAL) Recover() ([]record.Record, error) {
 	segments, err := listSegments(w.directory)
 	if err != nil {
-		return nil, fmt.Errorf("greska pri listanju WAL segmenata: %w", err)
+		return nil, fmt.Errorf(
+			"greska pri listanju WAL segmenata: %w",
+			err,
+		)
 	}
 
 	records := make([]record.Record, 0)
+
 	for _, segment := range segments {
 		segmentRecords, err := w.readSegment(segment.path)
 		if err != nil {
-			return nil, fmt.Errorf("greska pri citanju WAL segmenta %s: %w", segment.path, err)
+			return nil, fmt.Errorf(
+				"greska pri citanju WAL segmenta %s: %w",
+				segment.path,
+				err,
+			)
 		}
 
 		records = append(records, segmentRecords...)
@@ -133,7 +146,10 @@ func (w *WAL) Recover() ([]record.Record, error) {
 func (w *WAL) RemoveSegmentsUpTo(lastPersistedSegment int) error {
 	segments, err := listSegments(w.directory)
 	if err != nil {
-		return fmt.Errorf("greska pri listanju WAL segmenata: %w", err)
+		return fmt.Errorf(
+			"greska pri listanju WAL segmenata: %w",
+			err,
+		)
 	}
 
 	for _, segment := range segments {
@@ -141,8 +157,36 @@ func (w *WAL) RemoveSegmentsUpTo(lastPersistedSegment int) error {
 			continue
 		}
 
-		if err := os.Remove(segment.path); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("greska pri brisanju WAL segmenta %s: %w", segment.path, err)
+		if err := os.Remove(segment.path); err != nil &&
+			!os.IsNotExist(err) {
+			return fmt.Errorf(
+				"greska pri brisanju WAL segmenta %s: %w",
+				segment.path,
+				err,
+			)
+		}
+	}
+
+	return nil
+}
+
+func (w *WAL) Clear() error {
+	segments, err := listSegments(w.directory)
+	if err != nil {
+		return fmt.Errorf(
+			"greska pri listanju WAL segmenata: %w",
+			err,
+		)
+	}
+
+	for _, segment := range segments {
+		if err := os.Remove(segment.path); err != nil &&
+			!os.IsNotExist(err) {
+			return fmt.Errorf(
+				"greska pri brisanju WAL segmenta %s: %w",
+				segment.path,
+				err,
+			)
 		}
 	}
 
@@ -152,7 +196,10 @@ func (w *WAL) RemoveSegmentsUpTo(lastPersistedSegment int) error {
 func (w *WAL) currentSegment() (segmentInfo, int, error) {
 	segments, err := listSegments(w.directory)
 	if err != nil {
-		return segmentInfo{}, 0, fmt.Errorf("greska pri listanju WAL segmenata: %w", err)
+		return segmentInfo{}, 0, fmt.Errorf(
+			"greska pri listanju WAL segmenata: %w",
+			err,
+		)
 	}
 
 	if len(segments) == 0 {
@@ -163,9 +210,13 @@ func (w *WAL) currentSegment() (segmentInfo, int, error) {
 	}
 
 	current := segments[len(segments)-1]
+
 	count, err := w.countRecords(current.path)
 	if err != nil {
-		return segmentInfo{}, 0, fmt.Errorf("greska pri brojanju zapisa u WAL segmentu: %w", err)
+		return segmentInfo{}, 0, fmt.Errorf(
+			"greska pri brojanju zapisa u WAL segmentu: %w",
+			err,
+		)
 	}
 
 	return current, count, nil
@@ -177,12 +228,16 @@ func (w *WAL) countRecords(path string) (int, error) {
 		if os.IsNotExist(err) {
 			return 0, nil
 		}
+
 		return 0, err
 	}
 
 	blockSize := int64(w.blockManager.BlockSize())
+
 	if info.Size()%blockSize != 0 {
-		return 0, fmt.Errorf("velicina WAL segmenta nije poravnata sa velicinom bloka")
+		return 0, fmt.Errorf(
+			"velicina WAL segmenta nije poravnata sa velicinom bloka",
+		)
 	}
 
 	return int(info.Size() / blockSize), nil
@@ -195,13 +250,19 @@ func (w *WAL) readSegment(path string) ([]record.Record, error) {
 	}
 
 	records := make([]record.Record, 0, recordCount)
+
 	for blockNumber := 0; blockNumber < recordCount; blockNumber++ {
-		block, err := w.blockManager.ReadBlock(path, blockNumber)
+		block, err := w.blockManager.ReadBlock(
+			path,
+			blockNumber,
+		)
 		if err != nil {
 			return nil, err
 		}
 
-		rec, _, err := deserializeRecord(bytes.NewReader(block))
+		rec, _, err := deserializeRecord(
+			bytes.NewReader(block),
+		)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return records, nil
