@@ -22,15 +22,15 @@ type Engine struct {
 func NewEngine(cfg config.Config) (*Engine, error) {
 	mt := memtable.NewMemtable(cfg.MemtableSize)
 
-	w, err := wal.New("data/wal", cfg.WALSegmentSize)
-	if err != nil {
-		return nil, err
-	}
-
 	bm, err := blockmanager.New(
 		cfg.BlockSize,
 		cfg.BlockCacheSize,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	w, err := wal.NewWithBlockManager("data/wal", cfg.WALSegmentSize, bm)
 	if err != nil {
 		return nil, err
 	}

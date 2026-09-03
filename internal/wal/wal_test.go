@@ -67,7 +67,7 @@ func TestRecoverDetectsCRCError(t *testing.T) {
 	}
 	defer file.Close()
 
-	if _, err := file.Seek(-1, 2); err != nil {
+	if _, err := file.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error = %v", err)
 	}
 
@@ -77,6 +77,26 @@ func TestRecoverDetectsCRCError(t *testing.T) {
 
 	if _, err := log.Recover(); err == nil {
 		t.Fatal("Recover() error = nil, want CRC error")
+	}
+}
+
+func TestAppendRejectsRecordLargerThanBlock(t *testing.T) {
+	dir := t.TempDir()
+
+	log, err := New(dir, 10)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	value := make([]byte, log.blockManager.BlockSize())
+
+	err = log.Append(record.Record{
+		Key:       "oversized",
+		Value:     value,
+		Timestamp: 1,
+	})
+	if err == nil {
+		t.Fatal("Append() error = nil, want oversized record error")
 	}
 }
 
